@@ -67,3 +67,5 @@ benchmark-hist-equalization --gpu -e bi -f input_img.ppm -ws 63 -bmits 10 \
   --benchmark_out=bmk_results.csv
 
 ```
+
+Use `benchmark-hist-equalization -h` for more informations on the launch arguments.
