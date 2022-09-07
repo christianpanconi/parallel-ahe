@@ -59,7 +59,7 @@ The `-mws` option can be specified to run multiple benchmarks on the same image 
 benchmark-hist-equalization --gpu -e bi -f input_img.ppm -bmits 10 -mws 63,125,255
 ```
 
-Finally an example usage including some Google benchmark options:
+An example usage including some Google benchmark options:
 ```bash
 benchmark-hist-equalization --gpu -e bi -f input_img.ppm -ws 63 -bmits 10 \
   --benchmark_repetitions=10 \
