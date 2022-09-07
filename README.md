@@ -23,7 +23,7 @@ The two executables can be found inside the `<project_root>/build/bin` folder.
 ## Running equalization and benchmarks
 #### hist-equalization
 The `hist-equaliztion` executable can be used to perform the equalization on a single image using either a sequential or a parallel implementation (OpenMP or CUDA).\
-It supports JPEG and uncompressed images as input but only uncompressed output (for exa).\
+It supports JPEG and uncompressed images as input but only uncompressed output (for example *ppm*).\
 Basic usages:
 ```bash
 # Sequential
