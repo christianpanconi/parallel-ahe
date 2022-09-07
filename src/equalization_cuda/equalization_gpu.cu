@@ -20,31 +20,25 @@ equalize_hist_SWAHE_kernel_mono(
 	unsigned char* aug_channel , unsigned int aug_width , unsigned int aug_height ,
 	unsigned char* dst_channel , unsigned int width , unsigned int height ,
 	unsigned int window_size , unsigned int pb_width , unsigned int pb_height ){
-//	unsigned int n_values=256){
 
 	unsigned int window_half = window_size /2;
 
 	unsigned int tid = threadIdx.y * blockDim.x + threadIdx.x;
 	unsigned int n_threads = blockDim.x * blockDim.y;
-//	unsigned int acc_steps = 256 / (blockDim.x*blockDim.y); // 256 multiple of n_threads
 	unsigned int acc_steps = N_VALUES / (blockDim.x*blockDim.y); // 256 multiple of n_threads
 
 	// how many steps per window the current block should perform
 	// in both directions x and y
 	unsigned int x_steps = ceil( window_size/(float)blockDim.x );
 	unsigned int y_steps = ceil( window_size/(float)blockDim.y );
-//	__shared__ unsigned int hist[3*256]; // Double buffer + tmp
 	__shared__ unsigned int hist[3*N_VALUES]; // Double buffer + tmp
 
 	// target pixel coordinates
-//	unsigned int px = blockIdx.x * pb_size;
-//	unsigned int py = blockIdx.y * pb_size;
 	unsigned int px = blockIdx.x * pb_width;
 	unsigned int py = blockIdx.y * pb_height;
 	unsigned char target_value;
 	unsigned int in = 0, out = 1 , tmp = 2 , last_acc = 0;
 
-//	for( int c=0 ; c < pb_size && blockIdx.x*pb_size+c < width; c++ ){ 	// col index
 	for( int c=0 ; c < pb_width && blockIdx.x*pb_width+c < width; c++ ){ 	// col index
 		py = blockIdx.y * pb_height;
 		px = blockIdx.x * pb_width + c;
@@ -52,7 +46,6 @@ equalize_hist_SWAHE_kernel_mono(
 		// reset the histogram buffers
 		for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ ) // acc_steps = 256 bins / 64 threads
 			hist[ tmp*N_VALUES + reset_step*n_threads + tid ] = 0;
-//			hist[ tmp*256 + reset_step*n_threads + tid ] = 0;
 		__syncthreads();
 
 		// Build full window histogram (leave out last row)
@@ -62,14 +55,10 @@ equalize_hist_SWAHE_kernel_mono(
 					atomicAdd(
 						&(hist[ tmp*N_VALUES + aug_channel[(py+threadIdx.y+i*blockDim.y)*aug_width + px+j*blockDim.x+threadIdx.x ]]),
 						1 );
-//					atomicAdd(
-//						&(hist[ tmp*256 + aug_channel[(py+threadIdx.y+i*blockDim.y)*aug_width + px+j*blockDim.x+threadIdx.x ]]),
-//						1 );
 			}
 		}
 		__syncthreads();
 
-//		for( int r=0 ; r < pb_size && blockIdx.y*pb_size+r < height; r++){  // row index
 		for( int r=0 ; r < pb_height && blockIdx.y*pb_height+r < height; r++){  // row index
 			py = blockIdx.y * pb_height + r;
 
@@ -79,9 +68,6 @@ equalize_hist_SWAHE_kernel_mono(
 					atomicAdd(
 						&(hist[tmp*N_VALUES + aug_channel[(py+window_size-1)*aug_width + px + i*n_threads + tid ]]) ,
 						1 );
-//					atomicAdd(
-//						&(hist[tmp*256 + aug_channel[(py+window_size-1)*aug_width + px + i*n_threads + tid ]]) ,
-//						1 );
 			}
 			__syncthreads();
 
@@ -100,31 +86,21 @@ equalize_hist_SWAHE_kernel_mono(
 					if( tid >= offset )
 						hist[out*N_VALUES + acc_step*n_threads + tid ] =
 							hist[in*N_VALUES + acc_step*n_threads + tid - offset ] + hist[in*N_VALUES + acc_step*n_threads + tid];
-//						hist[out*256 + acc_step*n_threads + tid ] =
-//							hist[in*256 + acc_step*n_threads + tid - offset ] + hist[in*256 + acc_step*n_threads + tid];
 					else
 						hist[out*N_VALUES + acc_step*n_threads + tid ] = hist[in*N_VALUES + acc_step*n_threads + tid];
-//						hist[out*256 + acc_step*n_threads + tid ] = hist[in*256 + acc_step*n_threads + tid];
 					__syncthreads();
 				}
-//				hist[out*256 + acc_step*n_threads + tid] += last_acc;
 				hist[out*N_VALUES + acc_step*n_threads + tid] += last_acc;
 				__syncthreads();
 				last_acc = hist[out*N_VALUES + acc_step*n_threads + n_threads-1];
-//				last_acc = hist[out*256 + acc_step*n_threads + n_threads-1];
 				__syncthreads();
 			}
 
 			// Compute the equalized value using only the first thread
 			if( threadIdx.x == 0 && threadIdx.y==0 ){
 				dst_channel[py*width + px] = clamp8bit_d(
-//						(unsigned int)((float)hist[out*256 + target_value ] * (max-min) / (window_size*window_size) + min + 0.5 )
-//					(unsigned int)((float)hist[out*256 + target_value] * (255) / (window_size*window_size) + 0.5 )
 					(unsigned int)((float)hist[out*N_VALUES + target_value] * (N_VALUES-1) / (window_size*window_size) + 0.5 )
 				);
-				// XXX Debug print
-//				if( blockIdx.x == 8 && blockIdx.y == 0 ){ printf( "blockIdx.x: %d , blockIdx.y: %d , ( px: %d , py: %d ) | eq val: %d | cdf: %d | target_val: %d\n" ,
-//					blockIdx.x , blockIdx.y , px , py , (int)eq_v  , hist[out*256 + target_value ] , target_value ); }
 			}
 			__syncthreads();
 
@@ -133,7 +109,6 @@ equalize_hist_SWAHE_kernel_mono(
 			for( int i=0 ; i < ceil(window_size/(float)n_threads) ; i++ ){
 				if( i * n_threads + tid < window_size )
 					atomicSub( &(hist[tmp*N_VALUES + aug_channel[py*aug_width + px + i*n_threads + tid ]]) , 1 );
-//					atomicSub( &(hist[tmp*256 + aug_channel[py*aug_width + px + i*n_threads + tid ]]) , 1 );
 			}
 			__syncthreads();
 
@@ -153,21 +128,18 @@ equalize_hist_SWAHE_kernel_bi(
 	unsigned char* aug_channel , unsigned int aug_width , unsigned int aug_height ,
 	unsigned char* dst_channel , unsigned int width , unsigned int height ,
 	unsigned int window_size , unsigned int pb_width , unsigned int pb_height ){
-//	unsigned int n_values=256){
 
 	unsigned int window_half = window_size /2;
 
 	unsigned int tid = threadIdx.y * blockDim.x + threadIdx.x;
 	unsigned int n_threads = blockDim.x * blockDim.y;
 	unsigned int acc_steps = N_VALUES / (blockDim.x*blockDim.y); // 256 multiple of n_threads
-//	unsigned int acc_steps = 256 / (blockDim.x*blockDim.y); // 256 multiple of n_threads
 
 	// how many steps per window the current block should perform
 	// in both directions x and y
 	unsigned int x_steps = ceil( window_size/(float)blockDim.x );
 	unsigned int y_steps = ceil( window_size/(float)blockDim.y );
 	__shared__ unsigned int hist[3*N_VALUES]; // Double buffer + tmp
-//	__shared__ unsigned int hist[3*256]; // Double buffer + tmp
 
 	// target pixel coordinates
 	unsigned int px = blockIdx.x * pb_width;
@@ -178,7 +150,6 @@ equalize_hist_SWAHE_kernel_bi(
 	// reset the histogram buffers
 	for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ ) // acc_steps = 256 bins / 64 threads
 		hist[ tmp*N_VALUES + reset_step*n_threads + tid ] = 0;
-//		hist[ tmp*256 + reset_step*n_threads + tid ] = 0;
 	__syncthreads();
 
 	// Build full window histogram (leave out last col)
@@ -188,9 +159,6 @@ equalize_hist_SWAHE_kernel_bi(
 				atomicAdd(
 					&(hist[ tmp*N_VALUES + aug_channel[(py+threadIdx.y+i*blockDim.y)*aug_width + px+j*blockDim.x+threadIdx.x ]]),
 					1 );
-//				atomicAdd(
-//					&(hist[ tmp*256 + aug_channel[(py+threadIdx.y+i*blockDim.y)*aug_width + px+j*blockDim.x+threadIdx.x ]]),
-//					1 );
 		}
 	}
 	__syncthreads();
@@ -206,8 +174,6 @@ equalize_hist_SWAHE_kernel_bi(
 			if( i*n_threads + tid < window_size && py < height )
 				atomicAdd( &(hist[tmp*N_VALUES + aug_channel[(py+i*n_threads+tid)*aug_width + px + window_size-1 ]])
 				, 1 );
-//				atomicAdd( &(hist[tmp*256 + aug_channel[(py+i*n_threads+tid)*aug_width + px + window_size-1 ]])
-//				, 1 );
 		}
 		__syncthreads();
 
@@ -223,7 +189,6 @@ equalize_hist_SWAHE_kernel_bi(
 					for( int i=0 ; i < ceil(window_size/(float)n_threads) ; i++ ){
 						if( i * n_threads + tid < window_size )
 							atomicAdd( &(hist[tmp*N_VALUES + aug_channel[(py+(1-dir)*(window_size-1))*aug_width + px + i*n_threads + tid ]]) , 1 );
-//							atomicAdd( &(hist[tmp*256 + aug_channel[(py+(1-dir)*(window_size-1))*aug_width + px + i*n_threads + tid ]]) , 1 );
 					}
 				}
 				__syncthreads();
@@ -241,18 +206,13 @@ equalize_hist_SWAHE_kernel_bi(
 						if( tid >= offset )
 							hist[out*N_VALUES + acc_step*n_threads + tid ] =
 								hist[in*N_VALUES + acc_step*n_threads + tid - offset ] + hist[in*256 + acc_step*n_threads + tid];
-//							hist[out*256 + acc_step*n_threads + tid ] =
-//								hist[in*256 + acc_step*n_threads + tid - offset ] + hist[in*256 + acc_step*n_threads + tid];
 						else
 							hist[out*N_VALUES + acc_step*n_threads + tid ] = hist[in*256 + acc_step*n_threads + tid];
-//							hist[out*256 + acc_step*n_threads + tid ] = hist[in*256 + acc_step*n_threads + tid];
 						__syncthreads();
 					}
 					hist[out*N_VALUES + acc_step*n_threads + tid] += last_acc;
-//					hist[out*256 + acc_step*n_threads + tid] += last_acc;
 					__syncthreads();
 					last_acc = hist[out*N_VALUES + acc_step*n_threads + n_threads-1];
-//					last_acc = hist[out*256 + acc_step*n_threads + n_threads-1];
 					__syncthreads();
 				}
 
@@ -263,7 +223,6 @@ equalize_hist_SWAHE_kernel_bi(
 				if( threadIdx.x == 0 && threadIdx.y==0 )
 					dst_channel[py*width + px] = clamp8bit_d(
 						(unsigned int)((float)hist[out*N_VALUES + target_value] * (N_VALUES-1) / (window_size*window_size) + 0.5 )
-//						(unsigned int)((float)hist[out*256 + target_value] * (255) / (window_size*window_size) + 0.5 )
 					);
 				__syncthreads();
 
@@ -274,7 +233,6 @@ equalize_hist_SWAHE_kernel_bi(
 					for( int i=0 ; i < ceil(window_size/(float)n_threads) ; i++ ){
 						if( i * n_threads + tid < window_size )
 							atomicSub( &(hist[tmp*N_VALUES + aug_channel[(py+dir*(window_size-1))*aug_width + px + i*n_threads + tid ]]) , 1 );
-//							atomicSub( &(hist[tmp*256 + aug_channel[(py+dir*(window_size-1))*aug_width + px + i*n_threads + tid ]]) , 1 );
 					}
 				}
 				__syncthreads();
@@ -286,7 +244,6 @@ equalize_hist_SWAHE_kernel_bi(
 		for( int i=0 ; i < ceil(window_size/(float)n_threads) ; i++ ){
 			if( i*n_threads + tid < window_size && py < height )
 				atomicSub( &(hist[tmp*N_VALUES + aug_channel[(py+i*n_threads+tid)*aug_width + px ]]) , 1 );
-//				atomicSub( &(hist[tmp*256 + aug_channel[(py+i*n_threads+tid)*aug_width + px ]]) , 1 );
 		}
 		__syncthreads();
 
@@ -327,7 +284,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_bi(
 	unsigned char* channel , unsigned int width , unsigned int height ,
 	unsigned int window_size ,
 	unsigned int pb_width , unsigned int pb_height ){
-//	unsigned int n_values ){
 
 	window_size += window_size % 2 == 0 ? 1 : 0;
 	unsigned int aug_width , aug_height;
@@ -345,7 +301,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_bi(
 		aug_channel_d , aug_width , aug_height ,
 		eq_channel_d , width , height ,
 		window_size , pb_width , pb_height
-//		, n_values
 	);
 
 	cudaDeviceSynchronize();
@@ -361,7 +316,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_mono(
 	unsigned char* channel , unsigned int width , unsigned int height ,
 	unsigned int window_size ,
 	unsigned int pb_width , unsigned int pb_height ){
-//	unsigned int n_values ){
 
 	window_size += window_size % 2 == 0 ? 1 : 0;
 	unsigned int aug_width , aug_height;
@@ -379,7 +333,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_mono(
 		aug_channel_d , aug_width , aug_height ,
 		eq_channel_d , width , height ,
 		window_size , pb_width , pb_height
-//		, n_values
 	);
 
 	cudaDeviceSynchronize();
