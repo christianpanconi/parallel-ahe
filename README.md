@@ -9,16 +9,16 @@ These dependecies are **required** to build the project:
 * [Google benchmark](https://github.com/google/benchmark)
 
 ## Build
-Clone this repository in a `<project_root>` folder.
+Clone this repository (assumed in `parallel-ahe` folder).\
 Then:
 ```bash
-mkdir <project_root>/build
-cd <project_root>/build
+mkdir parallel-ahe/build
+cd parallel-ahe/build
 cmake -DCMAKE_BUILD_TYPE:STRING=Release ..
 make all
 ```
 
-The two executables can be found inside the `<project_root>/build/bin` folder.
+The two executables can be found inside the `parallel-ahe/build/bin` folder.
 
 ## Running equalization and benchmarks
 #### hist-equalization
