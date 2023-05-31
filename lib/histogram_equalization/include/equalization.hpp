@@ -85,11 +85,6 @@ unsigned char* augmented_channel( unsigned char* channel , unsigned int width , 
 	return aug_channel;
 }
 
-
-typedef struct aligned_hist_value{
-	alignas(64) unsigned int value;
-} aligned_hist_value;
-
 /**
  * AHE implementation with sliding window.
  * At each step the window histogram is computed from
@@ -238,81 +233,6 @@ unsigned char* equalize_hist_SWAHE_bi( unsigned char* channel ,
 		}
 
 		dir=1-dir;
-	}
-
-	delete aug_channel;
-	return eq_channel;
-}
-
-/**
- * Alternative implementation with the window sliding along the rows.
- * Only for testing purposes.
- */
-unsigned char* equalize_hist_AHE_alt( unsigned char *channel , unsigned int width , unsigned int height ,
-									  unsigned int window_size , unsigned int n_values=256){
-
-	// window_size to nearest odd integer
-	window_size += window_size % 2 == 0 ? 1 : 0;
-
-	// augmented channel with mirrored borders
-	unsigned int aug_width , aug_height;
-	unsigned char* aug_channel = augmented_channel(
-		channel , width, height, window_size, &aug_width, &aug_height );
-	// equalized values channel
-	unsigned char* eq_channel = new unsigned char[width*height];
-
-	// histograms
-	unsigned int hist[n_values];
-
-	// indices
-	unsigned int c_start;
-	unsigned int r_start;
-
-	// cdf
-	unsigned int cdf_v;
-
-	for( int i=0 ; i < height ; i++ ){ // i -> channel row index
-//		c_start = i;
-//		r_start = 0;
-		c_start = 0;
-		r_start = i;
-
-		// calculate the histogram on the whole window only for
-		// the first pixel of the row (leave out last column)
-		memset( hist , 0 , sizeof hist );
-		for( int r=0 ; r < window_size ; r++ ){
-			for( int c=0 ; c < window_size-1 ; c++ ){
-				// XXX : here always r_start = 0
-				hist[aug_channel[(r+r_start)*aug_width + c_start + c]]++;
-			}
-		}
-
-		// iterate on the column (downward)
-		for( int j=0 ; j < width ; j++ ){ // j -> channel column index
-
-			// add the histogram of the last window column
-			for( int r=0 ; r < window_size ; r++ )
-				hist[aug_channel[(r_start + r) * aug_width + c_start + window_size-1 ]]++;
-
-			// CDF
-			// (vectorizable)
-			cdf_v = 0;
-			for( unsigned int l=0; l <= channel[i*width+j] ; l++ )
-				cdf_v += hist[l];
-
-			// Compute equalized value
-			eq_channel[i*width+j] = clamp8bit(
-//				(unsigned int)((float)cdf_v*(max-min)/(window_size*window_size) + min + 0.5)
-				(unsigned int)((float)cdf_v*(n_values-1)/(window_size*window_size) + 0.5)
-			);
-
-			// subtract the left column histogram for the next iteration
-			for( int r = 0 ; r < window_size ; r++ )
-				hist[aug_channel[(r_start+r)*aug_width + c_start ]]--;
-//			r_start++;
-			c_start++;
-
-		}
 	}
 
 	delete aug_channel;

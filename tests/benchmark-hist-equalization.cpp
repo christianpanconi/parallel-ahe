@@ -8,7 +8,6 @@
 #include <algorithm>
 
 #include <random>
-#include <sched.h>
 #include <benchmark/benchmark.h> // Google benchmark
 
 // custom utils
@@ -16,50 +15,9 @@
 #include "img_utils/ImageProcessor.hpp"
 #include "img_utils/color_conversion.hpp"
 // equalization implementations
-//#include "equalization_cpu/equalization.hpp"			// Sequential
-//#include "equalization_cpu/equalization_parallel.hpp"	// OpenMP
-//#include "equalization_cuda/equalization_gpu.cuh"		// CUDA
 #include "../lib/histogram_equalization/include/equalization.hpp" // Sequential
 #include "../lib/histogram_equalization/include/equalization_parallel.hpp"	// OpenMP
 #include "../lib/histogram_equalization/include/equalization_gpu.cuh"		// CUDA
-
-
-// UTILS:
-//
-// Cache flushing
-int *volatile cfb;
-volatile int sumb;
-
-void flush_the_cache(){
-	const size_t flush_size = 16*1024*1024;
-	int* flush_buffer = new int[flush_size]; // 64 Mb buffer
-	memset( flush_buffer , 1 , flush_size );
-	cfb = flush_buffer;
-
-	std::random_device rd;
-	std::mt19937_64 gen(rd());
-	std::uniform_int_distribution<unsigned long long> dis(0, flush_size-1);
-	unsigned long int read_its = 30*(16*1024*1024/64);
-	unsigned long long int sum=0;
-	for( int i=0 ; i < read_its ; i++ ){ // random read loop
-		sum += flush_buffer[dis(gen)];
-	}
-	sumb=sum;
-	delete flush_buffer;
-}
-//
-// CPU affinity
-void setCPUAffinity( unsigned int cpu_affinity ){
-	if( cpu_affinity < 0 ) return;
-	cpu_set_t mask;
-	int status;
-	CPU_ZERO(&mask);
-	CPU_SET( cpu_affinity , &mask );
-	status = sched_setaffinity( 0 , sizeof(mask) , &mask );
-	if( status != 0 )
-		std::cerr << "Failed to set cpu affinity" << std::endl;
-}
-// --------
 
 /**
  * Command line args parsing and launch configs.
@@ -73,9 +31,7 @@ typedef struct LaunchArgs {
 	unsigned int benchmark_its=0;
 
 	bool gpu=false;
-//	unsigned int pbh=64;
-//	unsigned int pbw=64;
-	// automatically determined
+	// defaults to automatically determined
 	unsigned int pbh=0;
 	unsigned int pbw=0;
 

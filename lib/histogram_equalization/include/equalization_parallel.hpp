@@ -8,7 +8,6 @@
 
 #include "equalization.hpp"
 #include "equalization_common.hpp"
-//#include "../timer/timer.hpp"
 
 /**
  * Parallel AHE implementation using OpenMP

@@ -1,3 +1,8 @@
+/**
+ * Color space conversion utilities
+ *  RGB <===> YCbCr
+ */
+
 #ifndef COLOR_CONVERSION_CPP_
 #define COLOR_CONVERSION_CPP_
 
@@ -23,7 +28,6 @@
 #define RGB2Cb( R , G , B ) CLAMP((( -43 * R -  85 * G + 128 * B + 128 ) >> 8 ) + 128 )
 #define RGB2Cr( R , G , B ) CLAMP((( 128 * R - 107 * G -  21 * B + 128 ) >> 8 ) + 128 )
 
-//__attribute__((optimize("no-tree-vectorize")))
 unsigned char ** RGB_to_YCbCr( unsigned char *rgb , unsigned int width , unsigned int height ){
 
 	unsigned int n_pix = width*height;

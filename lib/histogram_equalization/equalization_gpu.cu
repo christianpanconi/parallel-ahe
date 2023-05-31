@@ -7,6 +7,7 @@
 #include "include/equalization_gpu.cuh"
 #include "helper_cuda.h"
 
+// The block size is determined by the CUDA architecture
 #ifdef LB_CUDA_ARCHITECTURE
 	#if LB_CUDA_ARCHITECTURE >= 32 && LB_CUDA_ARCHITECTURE <= 37
 		#define LB_BLOCKS_PER_SM 16
@@ -43,14 +44,14 @@
 	#define BLOCK_SIZE_Y 8
 #endif
 
-
+// The kernels assume 256 distinct values for the channel
 #define N_VALUES 256
 
 // Kernels
 //------------------------------------------------------------------------------
 
 /**
- * Mono-Directional SWAHE
+ * Mono-Directional SWAHE kernel.
  * Each block operates on a pb_width*pb_height image tile.
  * CDF with parallel scan.
  */
@@ -58,8 +59,6 @@ __global__ void
 #ifdef LB_BLOCKS_PER_SM
 __launch_bounds__( LB_THREADS_PER_BLOCK , LB_BLOCKS_PER_SM )
 #endif
-//__launch_bounds__( 64 , 24 ) // CC 8.9 : 65536 registers/SM, 24 blocks/SM, 64 threads/block
-//__launch_bounds__( 64 , 32 ) // CC 6.1 : 65536 registers/SM, 32 blocks/SM, 64 threads/block
 equalize_hist_SWAHE_kernel_mono(
 	unsigned char* aug_channel , unsigned int aug_width , unsigned int aug_height ,
 	unsigned char* dst_channel , unsigned int width , unsigned int height ,
@@ -69,7 +68,6 @@ equalize_hist_SWAHE_kernel_mono(
 
 	unsigned int tid = threadIdx.y * blockDim.x + threadIdx.x;
 	unsigned int n_threads = blockDim.x * blockDim.y;
-//	unsigned int acc_steps = N_VALUES / (blockDim.x*blockDim.y); // 256 multiple of n_threads
 	unsigned int acc_steps = (unsigned int)ceilf(N_VALUES / (float)n_threads);
 
 	// how many steps per window the current block should perform
@@ -89,8 +87,8 @@ equalize_hist_SWAHE_kernel_mono(
 		px = blockIdx.x * pb_width + c;
 
 		// reset the histogram buffers
-		for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ ) // acc_steps = 256 bins / 64 threads
-			if( reset_step*n_threads + tid < N_VALUES ) // FIX
+		for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ )
+			if( reset_step*n_threads + tid < N_VALUES )
 				hist[ tmp*N_VALUES + reset_step*n_threads + tid ] = 0;
 		__syncthreads();
 
@@ -121,16 +119,14 @@ equalize_hist_SWAHE_kernel_mono(
 
 			// CDF ACCUMULATION
 			last_acc = 0;
-			for( int acc_step=0 ; acc_step < acc_steps ; acc_step++ ){ // 4 = 256 bins / 64 threads
+			for( int acc_step=0 ; acc_step < acc_steps ; acc_step++ ){
 				in = tmp;
 				out = 0;
 				for( int offset=1 ; offset < n_threads ; offset *= 2 ){
-//				unsigned int scan_limit = min( N_VALUES-(acc_steps*n_threads) , n_threads );
-//				for( int offset=1; offset < scan_limit ; offset*=2 ){ //fix
 					// swap buffers
 					out = 1 - out;
 					in = ( offset == 1 ? in : 1-(in%2) );
-					if( acc_step*n_threads + tid < N_VALUES ) // FIX
+					if( acc_step*n_threads + tid < N_VALUES )
 						if( tid >= offset )
 							hist[out*N_VALUES + acc_step*n_threads + tid ] =
 								hist[in*N_VALUES + acc_step*n_threads + tid - offset ] + hist[in*N_VALUES + acc_step*n_threads + tid];
@@ -138,12 +134,11 @@ equalize_hist_SWAHE_kernel_mono(
 							hist[out*N_VALUES + acc_step*n_threads + tid ] = hist[in*N_VALUES + acc_step*n_threads + tid];
 					__syncthreads();
 				}
-				if( acc_step * n_threads + tid < N_VALUES ) // FIX
+				if( acc_step * n_threads + tid < N_VALUES )
 					hist[out*N_VALUES + acc_step*n_threads + tid] += last_acc;
 				__syncthreads();
-				if( acc_step < acc_steps-1 ) // FIX
+				if( acc_step < acc_steps-1 )
 					last_acc = hist[out*N_VALUES + acc_step*n_threads + n_threads-1];
-//				last_acc = hist[out*N_VALUES + (acc_step<acc_steps-1 ? acc_step*n_threads + n_threads-1 : N_VALUES-1) ]; // FIX
 				__syncthreads();
 			}
 
@@ -169,16 +164,14 @@ equalize_hist_SWAHE_kernel_mono(
 }
 
 /**
- * Bi-Directional SWAHE
- * Each block operates on a pb_width*pb_height image tile alternating the direction.
+ * Bi-Directional SWAHE kernel.
+ * Each block operates on a pb_width*pb_height image region alternating the direction.
  * CDF with parallel scan.
  */
 __global__ void
 #ifdef LB_BLOCKS_PER_SM
 __launch_bounds__( LB_THREADS_PER_BLOCK , LB_BLOCKS_PER_SM )
 #endif
-//__launch_bounds__( 64 , 24 ) // CC 8.9 : 65536 registers/SM, 24 blocks/SM, 64 threads/block
-//__launch_bounds__( 64 , 32 )
 equalize_hist_SWAHE_kernel_bi(
 	unsigned char* aug_channel , unsigned int aug_width , unsigned int aug_height ,
 	unsigned char* dst_channel , unsigned int width , unsigned int height ,
@@ -188,8 +181,7 @@ equalize_hist_SWAHE_kernel_bi(
 
 	unsigned int tid = threadIdx.y * blockDim.x + threadIdx.x;
 	unsigned int n_threads = blockDim.x * blockDim.y;
-//	unsigned int acc_steps = N_VALUES / (blockDim.x*blockDim.y); // 256 multiple of n_threads
-	unsigned int acc_steps = (unsigned int)ceilf(N_VALUES/(float)n_threads); // FIX
+	unsigned int acc_steps = (unsigned int)ceilf(N_VALUES/(float)n_threads);
 
 	// how many steps per window the current block should perform
 	// in both directions x and y
@@ -204,8 +196,8 @@ equalize_hist_SWAHE_kernel_bi(
 	unsigned int in = 0, out = 1 , tmp = 2 , last_acc = 0;
 
 	// reset the histogram buffers
-	for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ ) // acc_steps = 256 bins / 64 threads
-		if( reset_step*n_threads + tid < N_VALUES ) // FIX
+	for( int reset_step=0 ; reset_step < acc_steps ; reset_step++ )
+		if( reset_step*n_threads + tid < N_VALUES )
 			hist[ tmp*N_VALUES + reset_step*n_threads + tid ] = 0;
 	__syncthreads();
 
@@ -253,30 +245,30 @@ equalize_hist_SWAHE_kernel_bi(
 				// CDF accumulation
 				last_acc = 0;
 
-				for( int acc_step=0 ; acc_step < acc_steps ; acc_step++ ){ // 4 = 256 bins / 64 threads
+				for( int acc_step=0 ; acc_step < acc_steps ; acc_step++ ){
 					in = tmp;
 					out = 0;
 					for( int offset=1 ; offset < n_threads ; offset *= 2 ){
 						// swap buffers
 						out = 1 - out;
 						in = ( offset == 1 ? in : 1-(in%2) );
-						if( acc_step*n_threads+tid < N_VALUES ) // FIX
+						if( acc_step*n_threads+tid < N_VALUES )
 							if( tid >= offset )
 								hist[out*N_VALUES + acc_step*n_threads + tid ] =
-									hist[in*N_VALUES + acc_step*n_threads + tid - offset ] + hist[in*256 + acc_step*n_threads + tid];
+									hist[in*N_VALUES + acc_step*n_threads + tid - offset ] + hist[in*N_VALUES + acc_step*n_threads + tid];
 							else
-								hist[out*N_VALUES + acc_step*n_threads + tid ] = hist[in*256 + acc_step*n_threads + tid];
+								hist[out*N_VALUES + acc_step*n_threads + tid ] = hist[in*N_VALUES + acc_step*n_threads + tid];
 						__syncthreads();
 					}
-					if( acc_step*n_threads+tid < N_VALUES ) // FIX
+					if( acc_step*n_threads+tid < N_VALUES )
 						hist[out*N_VALUES + acc_step*n_threads + tid] += last_acc;
 					__syncthreads();
-					if( acc_step < acc_steps-1 ) // FIX
+					if( acc_step < acc_steps-1 )
 						last_acc = hist[out*N_VALUES + acc_step*n_threads + n_threads-1];
 					__syncthreads();
 				}
 
-				// target (center window) pixel value
+				// target (window center) pixel value
 				target_value = aug_channel[(window_half+py)*aug_width + window_half+px ];
 
 				// Compute the equalized value using only the first thread of the block
@@ -314,7 +306,11 @@ equalize_hist_SWAHE_kernel_bi(
 
 // Utilities
 //------------------------------------------------------------------------------
-
+/**
+ * Prepare the image to be processed by the AHE kernel:
+ *  - channel augmentation (borders mirroring)
+ *  - device memory allocation.
+ */
 __host__ void prepare(
 	unsigned char *channel , unsigned int width , unsigned int height , unsigned int window_size ,
 	unsigned char** aug_channel , unsigned int* aug_width , unsigned int* aug_height ,
@@ -332,7 +328,7 @@ __host__ void prepare(
 }
 
 __host__ unsigned char *get_result_and_free(
-	unsigned char *aug_channel_d , unsigned int width , unsigned int height ,
+	unsigned int width , unsigned int height ,
 	unsigned char *eq_channel_d ){
 
 	unsigned char* eq_channel = new unsigned char[width*height];
@@ -342,6 +338,11 @@ __host__ unsigned char *get_result_and_free(
 	return eq_channel;
 }
 
+/**
+ * Automatically determines the pixel block size (image region processed by a thread block).
+ * This value is determined such that the kernel process the whole image using a single wave (max number of thread blocks
+ * which can be run simultaneously on the GPU).
+ */
 __host__ unsigned int determine_pbs( unsigned int width , unsigned int height ){
 	int deviceID = findCudaDevice( 0 , nullptr );
 
@@ -354,6 +355,11 @@ __host__ unsigned int determine_pbs( unsigned int width , unsigned int height ){
 	return pbs;
 }
 
+/**
+ * Initializes the CUDA context.
+ * This utility is for benchmarking purposes, allows to not account for the CUDA context initialization time in the kernels
+ * execution time.
+ */
 __host__ void init_cuda_context(){
 	cudaFree(0);
 }
@@ -361,6 +367,9 @@ __host__ void init_cuda_context(){
 // Equalization functions
 //------------------------------------------------------------------------------
 
+/**
+ * Bi-directional SWAHE
+ */
 __host__ unsigned char* equalize_hist_SWAHE_gpu_bi(
 	unsigned char* channel , unsigned int width , unsigned int height ,
 	unsigned int window_size ,
@@ -377,7 +386,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_bi(
 		&aug_channel_d , &eq_channel_d );
 
 	// ---- Kernel launch
-//	dim3 blockSize( 8 , 8 , 1 );
 	dim3 blockSize( BLOCK_SIZE_X , BLOCK_SIZE_Y , 1 );
 	dim3 gridSize( (int)ceil((float)width/pb_width) ,
 				   (int)ceil((float)height/pb_height) );
@@ -394,9 +402,12 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_bi(
 	cudaFree(aug_channel_d);
 	delete aug_channel;
 
-	return get_result_and_free(aug_channel_d, width, height, eq_channel_d);
+	return get_result_and_free(width, height, eq_channel_d);
 }
 
+/**
+ * Mono-directional SWAHE
+ */
 __host__ unsigned char* equalize_hist_SWAHE_gpu_mono(
 	unsigned char* channel , unsigned int width , unsigned int height ,
 	unsigned int window_size ,
@@ -413,7 +424,6 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_mono(
 		&aug_channel_d , &eq_channel_d );
 
 	// ---- Kernel launch
-//	dim3 blockSize( 8 , 8 , 1 );
 	dim3 blockSize( BLOCK_SIZE_X , BLOCK_SIZE_Y , 1 );
 	dim3 gridSize( (int)ceil((float)width/pb_width) ,
 				   (int)ceil((float)height/pb_height) );
@@ -430,5 +440,5 @@ __host__ unsigned char* equalize_hist_SWAHE_gpu_mono(
 	cudaFree(aug_channel_d);
 	delete aug_channel;
 
-	return get_result_and_free(aug_channel_d, width, height, eq_channel_d);
+	return get_result_and_free(width, height, eq_channel_d);
 }

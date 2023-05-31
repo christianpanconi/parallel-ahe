@@ -146,9 +146,6 @@ PyObject* hist_equalization_omp( PyObject* self , PyObject* args ){
 
 // (img , window_size , eq_type , img_fmt , pbw , pbh)
 PyObject* hist_equalization_cuda( PyObject* self , PyObject* args ){
-
-	std::cout << "hist_equalization_CUDA" << std::endl;
-
 	PyArrayObject* img_ndarray;
 	unsigned int window_size, pbw, pbh;
 	int eq_type, img_fmt;

@@ -8,9 +8,6 @@
 #include "launch_utils.hpp"
 #include "timer/timer.hpp"
 // equalization implementations
-//#include "equalization_cpu/equalization.hpp"			// Sequential
-//#include "equalization_cpu/equalization_parallel.hpp"	// OpenMP
-//#include "equalization_cuda/equalization_gpu.cuh"		// CUDA
 #include "../lib/histogram_equalization/include/equalization.hpp"			// Sequential
 #include "../lib/histogram_equalization/include/equalization_parallel.hpp"	// OpenMP
 #include "../lib/histogram_equalization/include/equalization_gpu.cuh"		// CUDA
@@ -24,8 +21,6 @@ typedef struct LaunchArgs{
 
 	// CUDA args
 	bool gpu=false;
-//	unsigned int pbw=64;
-//	unsigned int pbh=64;
 	// automatically determined
 	unsigned int pbh=0;
 	unsigned int pbw=0;
@@ -132,7 +127,7 @@ int main(int argc, char **argv) {
 	if( args.help ){ // print usage
 		std::cout << R"(
 Bsic usage:        hist-equalization -f <input_img> -ws <window_size> -o <output_image>
-)" << std::endl << EqArgs::usage << usage << std::endl;//<< EqArgsC::usage << usage << std::endl;
+)" << std::endl << EqArgs::usage << usage << std::endl;
 		return EXIT_SUCCESS;
 	}
 	std::cout << args.to_string() << std::endl;

@@ -6,17 +6,12 @@
 #include <cuda_runtime.h>
 
 /**
- * Common
+ * Common / Utilities
  */
 extern __device__ unsigned char clamp8bit_d( unsigned int x );
 
 extern __device__ unsigned char clamp8bit_d( int x );
 
-/**
- * Augment the channel by mirroring the image borders.
- * The size of the produced channel is:
- * (width+window_size/2)*(height+window_size/2)
- */
 unsigned char* augment_channel( unsigned char* channel , unsigned int width , unsigned int height , unsigned int window_size ,
 								unsigned int *aug_ch_width , unsigned int *aug_ch_height );
 
