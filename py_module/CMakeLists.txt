@@ -4,7 +4,6 @@ project(mean_shift_module CUDA CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -41,6 +40,5 @@ add_library( histogram_equalization_module SHARED
 	${SOURCE_DIR}/histogram_equalization_py_wrappers.h
 	${SOURCE_DIR}/histogram_equalization_py_wrappers.cpp )
 target_link_libraries( histogram_equalization_module
-#	PRIVATE histogram_equalization_lib
 	PRIVATE histogram_equalization 
 	PRIVATE Python::NumPy )
