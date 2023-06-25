@@ -27,12 +27,6 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
 	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-# libjpeg-turbo
-find_path(JPEGTURBO_INCLUDE_DIR turbojpeg.h)
-find_library(JPEGTURBO_LIB turbojpeg)
-message( STATUS "JPEGTURBO_INCLUDE_DIR: ${JPEGTURBO_INCLUDE_DIR}" )
-message( STATUS "JPEGTURBO_LIB: ${JPEGTURBO_LIB}" )
-
 # Google benchmark
 #set(benchmark_DIR "/home/chris/Workspaces/cpp-workspace/google-benchmark/benchmark/build_test")
 option( DOWNLOAD_DEPENDENCIES "DOWNALOD_DEPENDENCIES" OFF )
@@ -64,15 +58,7 @@ else() # DOWNLOAD_DEPENDENCIES
 	)
 	FetchContent_GetProperties(libjpeg_turbo)
 	if( NOT libjpeg_turbo_POPULATED )
-		FetchContent_Populate(libjpeg_turbo)
-#		ExternalProject_Add( 
-#			libjpeg_turbo
-#			SOURCE_DIR "./_deps/libjpeg_turbo-src"
-#			BINARY_DIR "./_deps/libjpeg_turbo-build"
-#			STAMP_DIR "./_deps/libjpeg_turbo-stamp"
-#			INSTALL_DIR "./_deps/libjpeg_turbo-install"
-#			CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=../libjpeg_turbo-install
-#		)		
+		FetchContent_Populate(libjpeg_turbo)	
 		ExternalProject_Add( 
 			libjpeg_turbo
 			PREFIX "../_deps/libjpeg_turbo-build"
@@ -82,8 +68,12 @@ else() # DOWNLOAD_DEPENDENCIES
 			INSTALL_DIR "../_deps/libjpeg_turbo-install"
 			CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=../libjpeg_turbo-install
 		)
-		find_path( JPEGTURBO_INCLUDE_DIR turbojpeg.h PATHS ../_deps/libjpeg_turbo-install )
-		find_library( JPEGTURBO_LIB turbojpeg PATHS ../_deps/libjpeg_turbo-install )
+#		find_path( JPEGTURBO_INCLUDE_DIR turbojpeg.h PATHS ../_deps/libjpeg_turbo-install )
+#		find_library( JPEGTURBO_LIB turbojpeg PATHS ../_deps/libjpeg_turbo-install )
+		set( JPEGTURBO_INCLUDE_DIR ${CMAKE_BINARY_DIR}/_deps/libjpeg_turbo-install/include )
+		set( JPEGTURBO_LIB ${CMAKE_BINARY_DIR}/_deps/libjpeg_turbo-install/lib/libjpegturbo.so ) 
+		message( STATUS "JPEGTURBO_INCLUDE_DIR: ${JPEGTURBO_INCLUDE_DIR}" )
+		message( STATUS "JPEGTURBO_LIB: ${JPEGTURBO_LIB}" )
 	endif()	
 	
 	# Google benchmark

@@ -57,7 +57,7 @@ unsigned char* equalize_hist_SWAHE_omp_mono( unsigned char* channel ,
 				for( int c=0 ; c < window_size ; c++ )
 					hist[aug_channel[(r_start + window_size - 1) * aug_width + c_start + c]]++;
 
-				// CDF (on clipped histogram)
+				// CDF
 				// (vectorizable)
 				cdf_v = 0;
 				for( unsigned int l = 0 ; l <= channel[j*width+i] ; l++ )
