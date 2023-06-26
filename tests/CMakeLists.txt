@@ -28,7 +28,6 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
 endif()
 
 # Google benchmark
-#set(benchmark_DIR "/home/chris/Workspaces/cpp-workspace/google-benchmark/benchmark/build_test")
 option( DOWNLOAD_DEPENDENCIES "DOWNALOD_DEPENDENCIES" OFF )
 
 if( NOT DOWNLOAD_DEPENDENCIES )
@@ -38,14 +37,14 @@ if( NOT DOWNLOAD_DEPENDENCIES )
 	if( JPEGTURBO_INCLUDE_DIR STREQUAL "JPEGTURBO_INCLUDE_DIR-NOTFOUND" OR JPEGTURBO_LIB STREQUAL "JPEGTURBO_LIB-NOTFOUND" )
 		message( FATAL_ERROR "libjpeg-turbo not found. Install it or enable automatic dependencies download with '-DDOWNLOAD_DEPENDENCIES'." )
 	endif()
+	message( STATUS "JPEGTURBO_INCLUDE_DIR: ${JPEGTURBO_INCLUDE_DIR}" )
+	message( STATUS "JPEGTURBO_LIB: ${JPEGTURBO_LIB}" )
 
 	# Google benchmark
 	find_package( benchmark )
 	if( NOT benchmark_FOUND )
 		message( FATAL_ERROR "Google benchmark library not found. Supply an installation path using '-Dbenchmark_DIR' or enable automatic dependencies download with '-DDOWNLOAD_DEPENDENCIES=ON'." )
 	endif()	
-#endif()
-#if( DOWNLOAD_DEPENDENCIES )
 else() # DOWNLOAD_DEPENDENCIES
 	include(FetchContent)
 	include(ExternalProject)
@@ -68,12 +67,10 @@ else() # DOWNLOAD_DEPENDENCIES
 			INSTALL_DIR "../_deps/libjpeg_turbo-install"
 			CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=../libjpeg_turbo-install
 		)
-#		find_path( JPEGTURBO_INCLUDE_DIR turbojpeg.h PATHS ../_deps/libjpeg_turbo-install )
-#		find_library( JPEGTURBO_LIB turbojpeg PATHS ../_deps/libjpeg_turbo-install )
 		set( JPEGTURBO_INCLUDE_DIR ${CMAKE_BINARY_DIR}/_deps/libjpeg_turbo-install/include )
-		set( JPEGTURBO_LIB ${CMAKE_BINARY_DIR}/_deps/libjpeg_turbo-install/lib/libjpegturbo.so ) 
+		set( JPEGTURBO_LIB ${CMAKE_BINARY_DIR}/_deps/libjpeg_turbo-install/lib/libturbojpeg.so )
 		message( STATUS "JPEGTURBO_INCLUDE_DIR: ${JPEGTURBO_INCLUDE_DIR}" )
-		message( STATUS "JPEGTURBO_LIB: ${JPEGTURBO_LIB}" )
+		message( STATUS "JPEGTURBO_LIB: ${JPEGTURBO_LIB}" )  
 	endif()	
 	
 	# Google benchmark
@@ -88,15 +85,7 @@ else() # DOWNLOAD_DEPENDENCIES
 	FetchContent_MakeAvailable(google_benchmark)
 	message( STATUS "benchmark_SOURCE_DIR=${google_benchmark_SOURCE_DIR}" )
 	message( STATUS "benchmark_BINARY_DIR=${google_benchmark_BINARY_DIR}" )
-#	set( benchmark_DIR "${google_benchmark_BINARY_DIR}" )
 endif()
-
-# histogram equalization library
-#add_subdirectory( ../lib/histogram_equalization ./lib )
-#option(HIST_EQUALIZATION_LIB "HIST_EQUALIZATION_LIB")
-#if( NOT HIST_EQUALIZATION_LIB )
-#	add_subdirectory( ../lib/histogram_equalization ./lib )
-#endif()
 
 # Utils
 set( timer_LIBS timer/timer.hpp )
@@ -114,7 +103,7 @@ endif()
 target_include_directories(hist-equalization PRIVATE ${JPEGTURBO_INCLUDE_DIR} )
 target_link_libraries(hist-equalization
 	PRIVATE histogram_equalization
-	PRIVATE ${JPEGTURBO_LIB})
+	PRIVATE ${JPEGTURBO_LIB} )
 #set_property( TARGET hist-equalization PROPERTY CUDA_SEPARABLE_COMPILATION ON )
 target_compile_options( hist-equalization PRIVATE $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:
 	--generate-line-info
